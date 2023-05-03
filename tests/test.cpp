@@ -2,7 +2,7 @@
 
 int main()
 {
-    shared_vector<int> v;
+    unstd::shared_vector<int> v;
 
     return EXIT_SUCCESS;
 }
