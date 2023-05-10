@@ -1,6 +1,6 @@
 #pragma once
 
-#include <vector>
+#include <stdexcept>
 
 namespace unstd
 {
@@ -49,14 +49,14 @@ public:
     size_type capacity() const noexcept;
     void shrink_to_fit();
 
-    void clear() noexcept;
+    void clear();
     void push_back(const value_type& value);
     void resize(size_type count);
 
 private:
     // The local span
-    size_type offset = 0;
-    size_type length = 0;
+    size_type _offset = 0;
+    size_type _length = 0;
 
     // The shared vector
     void** _data;
@@ -127,6 +127,197 @@ shared_vector<T>& shared_vector<T>::operator=(shared_vector&& other) noexcept
     }
 
     return *this;
+}
+
+template <typename T>
+typename shared_vector<T>::reference shared_vector<T>::at(size_type pos)
+{
+    if (pos >= _length)
+        throw std::out_of_range("shared_vector::at");
+
+    return reinterpret_cast<pointer>(_data)[_offset + pos];
+
+}
+
+template <typename T>
+typename shared_vector<T>::const_reference shared_vector<T>::at(size_type pos) const
+{
+    if (pos >= _length)
+        throw std::out_of_range("shared_vector::at");
+
+    return reinterpret_cast<const_pointer>(_data)[_offset + pos];
+}
+
+template <typename T>
+typename shared_vector<T>::reference shared_vector<T>::operator[](size_type pos)
+{
+    return reinterpret_cast<pointer>(_data)[_offset + pos];
+}
+
+template <typename T>
+typename shared_vector<T>::const_reference shared_vector<T>::operator[](size_type pos) const
+{
+    return reinterpret_cast<pointer>(_data)[_offset + pos];
+}
+
+template <typename T>
+typename shared_vector<T>::reference shared_vector<T>::front()
+{
+    return reinterpret_cast<pointer>(_data)[_offset];
+}
+
+template <typename T>
+typename shared_vector<T>::const_reference shared_vector<T>::front() const
+{
+    return reinterpret_cast<const_pointer>(_data)[_offset];
+}
+
+template <typename T>
+typename shared_vector<T>::reference shared_vector<T>::back()
+{
+    return reinterpret_cast<pointer>(_data)[_offset + _length - 1];
+}
+
+template <typename T>
+typename shared_vector<T>::const_reference shared_vector<T>::back() const
+{
+    return reinterpret_cast<pointer>(_data)[_offset + _length - 1];
+}
+
+template <typename T>
+typename shared_vector<T>::pointer shared_vector<T>::data() noexcept
+{
+    return reinterpret_cast<pointer>(_data) + _offset;
+}
+
+template <typename T>
+typename shared_vector<T>::const_pointer shared_vector<T>::data() const noexcept
+{
+    return reinterpret_cast<pointer>(_data) + _offset;
+}
+
+template <typename T>
+typename shared_vector<T>::iterator shared_vector<T>::begin() noexcept
+{
+    return reinterpret_cast<pointer>(_data) + _offset;
+}
+
+template <typename T>
+typename shared_vector<T>::const_iterator shared_vector<T>::begin() const noexcept
+{
+    return reinterpret_cast<pointer>(_data) + _offset;
+}
+
+template <typename T>
+typename shared_vector<T>::iterator shared_vector<T>::end() noexcept
+{
+    return reinterpret_cast<pointer>(_data) + _offset + _length;
+}
+
+template <typename T>
+typename shared_vector<T>::const_iterator shared_vector<T>::end() const noexcept
+{
+    return reinterpret_cast<pointer>(_data) + _offset + _length;
+}
+
+template <typename T>
+bool shared_vector<T>::empty() const noexcept
+{
+    return _length == 0;
+}
+
+template <typename T>
+typename shared_vector<T>::size_type shared_vector<T>::size() const noexcept
+{
+    return _length;
+}
+
+template <typename T>
+typename shared_vector<T>::size_type shared_vector<T>::max_size() const noexcept
+{   
+    return (_offset + _length == *_size) ? std::numeric_limits<size_type>::max() : _length;
+}
+
+template <typename T>
+void shared_vector<T>::reserve(size_type new_cap)
+{
+    if (_offset + _length == *_size && _offset + new_cap > *_capacity)
+    {
+        void** new_data = new void*[_offset + new_cap];
+        std::copy(_data, _data + *_size, new_data);
+        delete[] _data;
+        _data = new_data;
+
+        *_capacity = _offset + new_cap;
+    }
+}
+
+template <typename T>
+typename shared_vector<T>::size_type shared_vector<T>::capacity() const noexcept
+{
+    return (_offset + _length == *_size) ? *_capacity - _offset : _length;
+}
+
+template <typename T>
+void shared_vector<T>::shrink_to_fit()
+{
+    if (_offset + _length == *_size)
+    {
+        void** new_data = new void*[*_size];
+        std::copy(_data, _data + *_size, new_data);
+        delete[] _data;
+        _data = new_data;
+
+        *_capacity = *_size;
+    }
+}
+
+template <typename T>
+void shared_vector<T>::clear()
+{
+    if (_offset + _length == *_size)
+    {
+        _offset = 0;
+        _length = 0;
+    }
+    else
+    {
+        throw std::domain_error("shared_vector::clear");
+    }
+}
+
+template <typename T>
+void shared_vector<T>::push_back(const_reference value)
+{
+    if (_offset + _length == *_size)
+    {
+        const size_type old_cap = capacity();
+        if (old_cap < _length + 1)
+            reserve(2*old_cap);
+
+        reinterpret_cast<pointer>(_data)[_offset + _length] = value;
+        _length++;
+    }
+    else
+    {
+        throw std::domain_error("shared_vector::push_back");
+    }
+}
+
+template <typename T>
+void shared_vector<T>::resize(size_type count)
+{
+    if (_offset + _length == *_size)
+    {
+        if (capacity() < count)
+            reserve(count);
+
+        _length = count;
+    }
+    else
+    {
+        throw std::domain_error("shared_vector::resize");
+    }
 }
 
 }
