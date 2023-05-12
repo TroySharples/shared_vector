@@ -1,2 +1,6 @@
-add_executable(test test.cpp)
-target_link_libraries(test PRIVATE shared-vector)
+include(GoogleTest)
+
+add_executable(shared_vector_test shared_vector_test.cpp)
+target_link_libraries(shared_vector_test PRIVATE shared-vector gtest pthread)
+
+add_test(shared_vector_test shared_vector_test)

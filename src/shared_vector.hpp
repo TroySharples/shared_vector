@@ -6,10 +6,17 @@ namespace unstd
 {
 
 template <typename T>
+class shared_vector;
+
+template <typename T>
+shared_vector<T> make_shared_vector(const shared_vector<T>& other, typename shared_vector<T>::const_iterator first, typename shared_vector<T>::const_iterator last);
+
+template <typename T>
 class shared_vector
 {
 public:
     shared_vector();
+    ~shared_vector();
 
     shared_vector(const shared_vector& other) noexcept;
     const shared_vector& operator=(const shared_vector& other) noexcept;
@@ -53,6 +60,8 @@ public:
     void push_back(const value_type& value);
     void resize(size_type count);
 
+    friend shared_vector<T> make_shared_vector<>(const shared_vector<T>& other, typename shared_vector<T>::const_iterator first, typename shared_vector<T>::const_iterator last);
+
 private:
     // The local span
     size_type _offset = 0;
@@ -79,8 +88,20 @@ shared_vector<T>::shared_vector()
 }
 
 template <typename T>
+shared_vector<T>::~shared_vector()
+{
+    if (_ref_count != nullptr && --(*_ref_count) == 0)
+    {
+        delete[] _data;
+        delete _capacity;
+        delete _size;
+        delete _ref_count;
+    }
+}
+
+template <typename T>
 shared_vector<T>::shared_vector(const shared_vector& other) noexcept
-    : _data(other._data), _capacity(other._capacity), _size(other._size), _ref_count(other._ref_count)
+    : _offset(other._offset), _length(other._length), _data(other._data), _capacity(other._capacity), _size(other._size), _ref_count(other._ref_count)
 {
     (*_ref_count)++;
 }
@@ -90,6 +111,8 @@ const shared_vector<T>& shared_vector<T>::operator=(const shared_vector& other) 
 {
     if (this != &other)
     {
+        _offset = other._offset;
+        _length = other._length;
         _data = other._data;
         _capacity = other._capacity;
         _size = other._size;
@@ -102,7 +125,7 @@ const shared_vector<T>& shared_vector<T>::operator=(const shared_vector& other) 
 
 template <typename T>
 shared_vector<T>::shared_vector(shared_vector&& other) noexcept
-    : _data(other._data), _capacity(other._capacity), _size(other._size), _ref_count(other._ref_count)
+    : _offset(other._offset), _length(other._length), _data(other._data), _capacity(other._capacity), _size(other._size), _ref_count(other._ref_count)
 {
     other._data = nullptr;
     other._capacity = nullptr;
@@ -115,6 +138,8 @@ shared_vector<T>& shared_vector<T>::operator=(shared_vector&& other) noexcept
 {
     if (this != &other)
     {
+        _offset = other._offset;
+        _length = other._length;
         _data = other._data;
         _capacity = other._capacity;
         _size = other._size;
@@ -297,6 +322,7 @@ void shared_vector<T>::push_back(const_reference value)
 
         reinterpret_cast<pointer>(_data)[_offset + _length] = value;
         _length++;
+        *_size = _offset + _length;
     }
     else
     {
@@ -313,11 +339,25 @@ void shared_vector<T>::resize(size_type count)
             reserve(count);
 
         _length = count;
+        *_size = _offset + _length;
     }
     else
     {
         throw std::domain_error("shared_vector::resize");
     }
+}
+
+template <typename T>
+shared_vector<T> make_shared_vector(const shared_vector<T>& other, typename shared_vector<T>::const_iterator first, typename shared_vector<T>::const_iterator last)
+{
+    if (first < other.begin() or last > other.end())
+        throw std::out_of_range("make_shared_vector");
+
+    shared_vector<T> ret = other;
+    ret._offset = std::distance(other.begin(), first);
+    ret._length = std::distance(first, last);
+
+    return ret;
 }
 
 }
